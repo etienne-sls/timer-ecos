@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Timer ECOS</title>
+  <style>
+    body {
+      font-family: Arial;
+      text-align: center;
+      margin-top: 40px;
+      background: #fafafa;
+    }
+
+    #phase {
+      font-size: 32px;
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+
+    #timer {
+      font-size: 80px;
+      font-weight: bold;
+      margin: 20px;
+    }
+
+    button {
+      font-size: 18px;
+      padding: 12px 18px;
+      margin: 8px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    #startBtn { background: #2ecc71; color: white; }
+    #pauseBtn { background: #bdc3c7; }
+    #resetBtn { background: #e74c3c; color: white; }
+  </style>
+</head>
+<body>
+
+<h1>Timer ECOS</h1>
+
+<div id="phase">Prêt</div>
+<div id="timer">00:00</div>
+
+<button id="startBtn" onclick="start()">Start</button>
+<button id="pauseBtn" onclick="pause()">Pause</button>
+<button id="resetBtn" onclick="reset()">Reset</button>
+
+<script>
+let audioCtx = null;
+
+function beep(freq = 1000, duration = 0.25) {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+
+  osc.frequency.value = freq;
+  osc.type = "sine";
+
+  gain.gain.setValueAtTime(1, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+
+  osc.start();
+  osc.stop(audioCtx.currentTime + duration);
+}
+
+// 🧠 ECOS 8 min / 2 min
+const sequence = [
+  { label: "Sujet", duration: 8 * 60 },
+  { label: "Pause", duration: 2 * 60 },
+  { label: "Sujet", duration: 8 * 60 },
+  { label: "Pause", duration: 2 * 60 },
+  { label: "Sujet", duration: 8 * 60 },
+  { label: "Pause", duration: 2 * 60 },
+  { label: "Sujet", duration: 8 * 60 },
+  { label: "Pause", duration: 2 * 60 },
+  { label: "Sujet", duration: 8 * 60 }
+];
+
+let startTime = null;
+let paused = false;
+let pauseStart = null;
+let pauseOffset = 0;
+
+let lastPhase = -1;
+let lastOneMinBeep = -1;
+
+function start() {
+  if (!startTime) startTime = Date.now();
+  else if (paused) {
+    pauseOffset += Date.now() - pauseStart;
+    paused = false;
+  }
+
+  audioCtx?.resume();
+}
+
+function pause() {
+  if (!paused) {
+    paused = true;
+    pauseStart = Date.now();
+  } else {
+    paused = false;
+    pauseOffset += Date.now() - pauseStart;
+  }
+}
+
+function reset() {
+  startTime = null;
+  paused = false;
+  pauseOffset = 0;
+
+  lastPhase = -1;
+  lastOneMinBeep = -1;
+
+  document.getElementById("phase").innerText = "Prêt";
+  document.getElementById("timer").innerText = "00:00";
+}
+
+function update() {
+  if (!startTime || paused) return;
+
+  let elapsed = (Date.now() - startTime - pauseOffset) / 1000;
+  let total = 0;
+
+  for (let i = 0; i < sequence.length; i++) {
+    let phase = sequence[i];
+    total += phase.duration;
+
+    if (elapsed < total) {
+
+      let remaining = total - elapsed;
+
+      let min = Math.floor(remaining / 60);
+      let sec = Math.floor(remaining % 60);
+
+      // 🔢 affichage Sujet 1 / Pause 1
+      let subjectCount = 0;
+      let pauseCount = 0;
+
+      for (let j = 0; j <= i; j++) {
+        if (sequence[j].label === "Sujet") subjectCount++;
+        else pauseCount++;
+      }
+
+      document.getElementById("phase").innerText =
+        phase.label + " " + (phase.label === "Sujet" ? subjectCount : pauseCount);
+
+      document.getElementById("timer").innerText =
+        String(min).padStart(2, '0') + ":" +
+        String(sec).padStart(2, '0');
+
+      // 🔊 fin de phase
+      if (i !== lastPhase) {
+        if (lastPhase !== -1) beep(1200, 0.3);
+        lastPhase = i;
+        lastOneMinBeep = -1;
+      }
+
+      // 🔔 bip 1 minute après début du sujet
+      if (phase.label === "Sujet") {
+        let elapsedInPhase = phase.duration - remaining;
+
+        if (elapsedInPhase >= 60 && lastOneMinBeep !== i) {
+          beep(900, 0.25);
+          lastOneMinBeep = i;
+        }
+      }
+
+      return;
+    }
+  }
+
+  document.getElementById("phase").innerText = "FIN";
+  document.getElementById("timer").innerText = "00:00";
+  beep(1500, 0.6);
+}
+
+setInterval(update, 500);
+</script>
+
+</body>
+</html>
