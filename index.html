@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Timer ECOS</title>
+  <style>
+    body {
+      font-family: Arial;
+      text-align: center;
+      margin-top: 50px;
+    }
+    #timer {
+      font-size: 80px;
+      margin: 20px;
+    }
+    button {
+      font-size: 20px;
+      padding: 10px 20px;
+      margin: 10px;
+    }
+  </style>
+</head>
+<body>
+
+<h1>Timer ECOS</h1>
+<div id="timer">00:00</div>
+
+<button onclick="start()">Démarrer</button>
+<button onclick="reset()">Reset</button>
+
+<audio id="beep" src="https://www.soundjay.com/buttons/beep-07.wav"></audio>
+
+<script>
+let startTime = null;
+
+const sequence = [
+  { label: "Sujet", duration: 8 * 60 },
+  { label: "Pause", duration: 2 * 60 },
+  { label: "Sujet", duration: 8 * 60 },
+  { label: "Pause", duration: 2 * 60 },
+  { label: "Sujet", duration: 8 * 60 },
+  { label: "Pause", duration: 2 * 60 },
+  { label: "Sujet", duration: 8 * 60 },
+  { label: "Pause", duration: 2 * 60 },
+  { label: "Sujet", duration: 8 * 60 }
+];
+
+function start() {
+  startTime = Date.now();
+  localStorage.setItem("startTime", startTime);
+}
+
+function reset() {
+  localStorage.removeItem("startTime");
+  startTime = null;
+}
+
+function update() {
+  startTime = localStorage.getItem("startTime");
+  if (!startTime) return;
+
+  let elapsed = (Date.now() - startTime) / 1000;
+
+  let total = 0;
+
+  for (let i = 0; i < sequence.length; i++) {
+    total += sequence[i].duration;
+
+    if (elapsed < total) {
+      let remaining = total - elapsed;
+      let minutes = Math.floor(remaining / 60);
+      let seconds = Math.floor(remaining % 60);
+
+      document.getElementById("timer").innerText =
+        sequence[i].label + " " +
+        String(minutes).padStart(2, '0') + ":" +
+        String(seconds).padStart(2, '0');
+
+      // sonnerie à chaque transition
+      if (Math.abs(remaining - sequence[i].duration) < 0.5) {
+        document.getElementById("beep").play();
+      }
+
+      return;
+    }
+  }
+
+  document.getElementById("timer").innerText = "FIN";
+}
+
+setInterval(update, 500);
+</script>
+
+</body>
+</html>
