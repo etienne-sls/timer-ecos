@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>TEST ECOS Sync</title>
+
+  <script src="https://cdn.ably.com/lib/ably.min-1.js"></script>
+
+  <style>
+    body { font-family: Arial; text-align:center; margin-top:40px; }
+    #phase { font-size: 30px; font-weight:bold; }
+    #timer { font-size: 70px; }
+  </style>
+</head>
+
+<body>
+
+<h1>TEST SYNC</h1>
+
+<div id="phase">Prêt</div>
+<div id="timer">00:00</div>
+
+<button onclick="startGlobal()">START</button>
+
+<script>
+const ably = new Ably.Realtime("TA_API_KEY_ICI");
+const channel = ably.channels.get("ecos-test");
+
+// 🧪 FAST MODE
+const sequence = [
+  { label: "Sujet", duration: 20 },
+  { label: "Pause", duration: 5 },
+  { label: "Sujet", duration: 20 },
+  { label: "Pause", duration: 5 },
+  { label: "Sujet", duration: 20 }
+];
+
+let startTime = null;
+let currentPhase = -1;
+
+let audioCtx = null;
+
+function beep(freq=1000,duration=0.2){
+  if(!audioCtx) audioCtx=new AudioContext();
+  let o=audioCtx.createOscillator();
+  let g=audioCtx.createGain();
+  o.connect(g); g.connect(audioCtx.destination);
+  o.frequency.value=freq;
+  g.gain.value=0.2;
+  o.start();
+  o.stop(audioCtx.currentTime+duration);
+}
+
+// START
+function startGlobal(){
+  channel.publish("state",{startTime:Date.now()});
+}
+
+// LISTEN
+channel.subscribe("state",(msg)=>{
+  startTime=msg.data.startTime;
+  currentPhase=-1;
+});
+
+// LOOP
+function update(){
+  if(!startTime)return;
+
+  let elapsed=(Date.now()-startTime)/1000;
+  let total=0;
+
+  for(let i=0;i<sequence.length;i++){
+    total+=sequence[i].duration;
+
+    if(elapsed<total){
+
+      let remaining=total-elapsed;
+
+      document.getElementById("phase").innerText=sequence[i].label;
+      document.getElementById("timer").innerText=Math.floor(remaining);
+
+      if(i!==currentPhase){
+        beep(1200,0.2);
+        currentPhase=i;
+      }
+
+      return;
+    }
+  }
+
+  document.getElementById("phase").innerText="FIN";
+}
+
+setInterval(update,500);
+</script>
+
+</body>
+</html>
